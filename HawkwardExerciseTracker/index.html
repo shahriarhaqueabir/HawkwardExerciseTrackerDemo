@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise Tracker Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --zen-primary: #6366f1;
+            --zen-secondary: #8b5cf6;
+            --zen-accent: #06b6d4;
+            --zen-bg: #0f172a;
+        }
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        .glass {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .timer-display {
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 30px rgba(99, 102, 241, 0.5);
+        }
+        .metronome-pulse {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+        .zen-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .zen-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.1);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen">
+    <div id="app">
+        <aside class="fixed left-0 top-0 h-full w-64 glass border-r border-slate-700/50 p-6 z-50">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    Exercise Tracker Pro
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">Your Fitness Journey</p>
+            </div>
+
+            <nav class="space-y-2">
+                <button v-for="tab in tabs" :key="tab" @click="activeTab = tab"
+                    :class="activeTab === tab ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'"
+                    class="w-full text-left px-4 py-3 rounded-xl font-medium transition-all">
+                    {{ tab }}
+                </button>
+            </nav>
+
+            <div class="absolute bottom-6 left-6 right-6">
+                <button @click="showExportImport = true" class="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-all">
+                    💾 Data Management
+                </button>
+            </div>
+        </aside>
+
+        <main class="ml-64 p-8 min-h-screen">
+            
+            <div v-if="activeTab === 'Dashboard'" class="max-w-4xl mx-auto">
+                <div class="text-center space-y-8">
+                    <div class="glass rounded-3xl p-12 zen-card">
+                        <div class="text-8xl font-bold timer-display mb-8">
+                            {{ formatTime(sessionTime) }}
+                        </div>
+                        
+                        <div class="flex justify-center gap-4">
+                            <button v-if="timerState === 'stopped'" @click="startTimer"
+                                class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl font-bold text-lg hover:opacity-90 transition-all">
+                                ▶ START
+                            </button>
+                            <button v-if="timerState === 'running'" @click="pauseTimer"
+                                class="px-8 py-4 bg-yellow-600 rounded-2xl font-bold text-lg hover:opacity-90 transition-all">
+                                ⏸ REST
+                            </button>
+                            <button v-if="timerState === 'paused'" @click="resumeTimer"
+                                class="px-8 py-4 bg-green-600 rounded-2xl font-bold text-lg hover:opacity-90 transition-all">
+                                ▶ RESUME
+                            </button>
+                            <button v-if="timerState !== 'stopped'" @click="stopTimer"
+                                class="px-8 py-4 bg-red-600 rounded-2xl font-bold text-lg hover:opacity-90 transition-all">
+                                ⏹ STOP
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="glass rounded-3xl p-8 zen-card">
+                        <h3 class="text-xl font-bold mb-6">Rhythm Metronome</h3>
+                        
+                        <div class="flex items-center justify-center gap-6 mb-6">
+                            <div :class="metronomeActive && metronomeBeat ? 'bg-cyan-500' : 'bg-slate-700'"
+                                class="w-24 h-24 rounded-full transition-all duration-100 flex items-center justify-center">
+                                <span class="text-3xl">{{ metronomeBpm }}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4 mb-4">
+                            <span class="text-sm font-medium w-12">50</span>
+                            <input type="range" v-model.number="metronomeBpm" min="50" max="250" 
+                                class="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                            <span class="text-sm font-medium w-12">250</span>
+                        </div>
+
+                        <button @click="toggleMetronome"
+                            :class="metronomeActive ? 'bg-red-600' : 'bg-indigo-600'"
+                            class="w-full py-3 rounded-xl font-bold hover:opacity-90 transition-all">
+                            {{ metronomeActive ? '⏹ Stop' : '▶ Start' }} Metronome
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="activeTab === 'Workout'">
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-xl font-bold mb-4">Fitness Streak</h3>
+                        <div v-if="fitnessStreakData.length > 0" class="h-48">
+                            <svg viewBox="0 0 400 150" class="w-full h-full">
+                                <line v-for="i in 5" :key="'grid-'+i" :x1="0" :y1="i*30" :x2="400" :y2="i*30" 
+                                    stroke="#334155" stroke-width="0.5" opacity="0.3"/>
+                                
+                                <polyline :points="getStreakPoints()" 
+                                    fill="none" stroke="#06b6d4" stroke-width="2"/>
+                                
+                                <circle v-for="(point, i) in fitnessStreakData" :key="'point-'+i"
+                                    :cx="(i / (fitnessStreakData.length - 1)) * 380 + 10"
+                                    :cy="140 - (point.count / Math.max(...fitnessStreakData.map(p => p.count))) * 120"
+                                    r="3" fill="#06b6d4"/>
+                            </svg>
+                            <p class="text-center text-sm text-slate-400 mt-2">
+                                Total Workouts: {{ fitnessStreakData[fitnessStreakData.length - 1].count }}
+                            </p>
+                        </div>
+                        <div v-else class="text-center py-12 text-slate-400">
+                            Complete your first workout to start your streak!
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold">Workout Session</h2>
+                        <div class="flex gap-3">
+                            <button @click="showTemplates = true" class="px-6 py-3 bg-indigo-600 rounded-xl font-bold hover:opacity-90">
+                                📋 Templates
+                            </button>
+                            <button @click="startQuickSession" class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl font-bold hover:opacity-90">
+                                🚀 Quick Start
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="currentSession">
+                        <div class="glass rounded-2xl p-6 flex justify-between items-center">
+                            <div>
+                                <input v-model="currentSession.name" placeholder="Session Name" 
+                                    class="bg-transparent text-xl font-bold border-b border-slate-600 focus:border-cyan-500 outline-none px-2 py-1">
+                                <p class="text-sm text-slate-400 mt-2">{{ new Date().toLocaleDateString() }}</p>
+                            </div>
+                            <div class="flex gap-3">
+                                <button @click="saveAsTemplate" class="px-4 py-2 bg-slate-700 rounded-lg text-sm font-medium hover:bg-slate-600">
+                                    💾 Save Template
+                                </button>
+                                <button @click="completeSession" class="px-6 py-3 bg-green-600 rounded-lg font-bold hover:opacity-90">
+                                    ✓ Complete Workout
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="exercise-list" class="space-y-4">
+                            <div v-for="(ex, i) in currentSession.exercises" :key="ex.id" 
+                                class="glass rounded-2xl p-6 cursor-move hover:border-cyan-500 transition-all">
+                                <div class="flex justify-between items-start mb-4">
+                                    <input v-model="ex.name" placeholder="Exercise name" 
+                                        class="bg-transparent text-lg font-bold outline-none flex-1">
+                                    <button @click="removeExercise(i)" class="text-red-500 hover:text-red-400 ml-4">
+                                        🗑️
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-4 gap-4">
+                                    <div>
+                                        <label class="text-xs text-slate-400 uppercase font-bold">Sets</label>
+                                        <input type="number" v-model.number="ex.sets" 
+                                            class="w-full bg-slate-800 rounded-lg p-2 mt-1 text-center outline-none focus:ring-2 ring-cyan-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-slate-400 uppercase font-bold">Reps</label>
+                                        <input type="number" v-model.number="ex.reps" 
+                                            class="w-full bg-slate-800 rounded-lg p-2 mt-1 text-center outline-none focus:ring-2 ring-cyan-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-slate-400 uppercase font-bold">Weight (kg)</label>
+                                        <input type="number" v-model.number="ex.weight" step="0.5"
+                                            class="w-full bg-slate-800 rounded-lg p-2 mt-1 text-center outline-none focus:ring-2 ring-cyan-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-slate-400 uppercase font-bold">RPE</label>
+                                        <input type="number" v-model.number="ex.rpe" min="1" max="10"
+                                            class="w-full bg-slate-800 rounded-lg p-2 mt-1 text-center outline-none focus:ring-2 ring-cyan-500">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button @click="addExercise" class="w-full py-4 border-2 border-dashed border-slate-700 rounded-2xl text-slate-400 font-bold hover:border-cyan-500 hover:text-cyan-500 transition-all">
+                            + Add Exercise
+                        </button>
+                    </div>
+
+                    <div v-else class="glass rounded-2xl p-12 text-center">
+                        <div class="text-6xl mb-4">🏋️</div>
+                        <h3 class="text-2xl font-bold mb-2">No Active Session</h3>
+                        <p class="text-slate-400 mb-6">Start a workout to begin tracking</p>
+                        <button @click="startQuickSession" class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl font-bold hover:opacity-90">
+                            Start Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="activeTab === 'History'">
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <h2 class="text-3xl font-bold">Workout History</h2>
+
+                    <div v-if="workoutDates.length === 0" class="glass rounded-2xl p-12 text-center">
+                        <div class="text-6xl mb-4">🕰️</div>
+                        <h3 class="text-2xl font-bold mb-2">No History Yet</h3>
+                        <p class="text-slate-400">Complete a workout to see it here.</p>
+                    </div>
+
+                    <div v-else class="space-y-4">
+                        <div v-for="workout in workoutDates" :key="workout.id" class="glass rounded-2xl p-6 zen-card">
+                            <div class="flex justify-between items-start mb-4 border-b border-slate-700/50 pb-4">
+                                <div>
+                                    <h3 class="text-xl font-bold text-white">{{ workout.name || 'Workout Session' }}</h3>
+                                    <p class="text-sm text-slate-400">
+                                        {{ new Date(workout.date).toLocaleDateString() }} • 
+                                        {{ new Date(workout.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xl font-mono font-bold text-cyan-400">
+                                        {{ formatTime(workout.duration || 0) }}
+                                    </div>
+                                    <button @click="deleteFromDb('workouts', workout.id)" class="text-xs text-red-500 hover:text-red-400 mt-2">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div v-if="workout.exercises && workout.exercises.length > 0" class="space-y-3">
+                                <div v-for="ex in workout.exercises" :key="ex.id" class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="font-bold text-indigo-300">{{ ex.name || 'Unnamed Exercise' }}</span>
+                                    </div>
+                                    <div class="flex gap-4 text-sm text-slate-400">
+                                        <span v-if="ex.sets">{{ ex.sets }} sets</span>
+                                        <span v-if="ex.reps">× {{ ex.reps }} reps</span>
+                                        <span v-if="ex.weight" class="text-cyan-400">@ {{ ex.weight }}kg</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else class="text-sm text-slate-500 italic">
+                                No exercise details recorded for this session.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="activeTab === 'Goals'">
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <h2 class="text-3xl font-bold">Fitness Goals</h2>
+
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-xl font-bold mb-4">Create New Goal</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <input v-model="newGoal.exercise" placeholder="Exercise (e.g., Bench Press)" 
+                                class="bg-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 ring-cyan-500">
+                            <input v-model.number="newGoal.target" type="number" placeholder="Target (kg)" 
+                                class="bg-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 ring-cyan-500">
+                            <button @click="addGoal" class="bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg font-bold hover:opacity-90">
+                                + Add Goal
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="goals.length === 0" class="glass rounded-2xl p-12 text-center">
+                        <div class="text-6xl mb-4">🎯</div>
+                        <h3 class="text-2xl font-bold mb-2">No Goals Yet</h3>
+                        <p class="text-slate-400">Create your first fitness goal above</p>
+                    </div>
+                    
+                    <div v-else class="space-y-4">
+                        <div v-for="goal in goals" :key="goal.id" class="glass rounded-2xl p-6 zen-card">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 class="text-xl font-bold">{{ goal.exercise }}</h4>
+                                    <p class="text-sm text-slate-400">Target: {{ goal.target }}kg</p>
+                                </div>
+                                <button @click="deleteGoal(goal.id)" class="text-red-500 hover:text-red-400">
+                                    🗑️
+                                </button>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="text-xs text-slate-400 uppercase font-bold">Current Weight (kg)</label>
+                                <input type="number" :value="goal.current" @input="updateGoalProgress(goal, $event.target.value)" 
+                                    step="0.5" class="w-full bg-slate-800 rounded-lg p-3 mt-1 outline-none focus:ring-2 ring-cyan-500">
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span>Progress</span>
+                                    <span class="font-bold text-cyan-400">{{ getGoalProgress(goal) }}%</span>
+                                </div>
+                                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                                    <div class="bg-gradient-to-r from-indigo-600 to-cyan-600 h-full transition-all duration-500" 
+                                        :style="{ width: getGoalProgress(goal) + '%' }"></div>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-900/50 rounded-lg p-4">
+                                <h5 class="text-sm font-bold text-slate-400 mb-3">PROGRESSIVE OVERLOAD FORECAST (3.5% weekly)</h5>
+                                <div class="space-y-2 text-sm">
+                                    <div v-for="week in getForecast(goal)" :key="week.week" class="flex justify-between">
+                                        <span class="text-slate-400">Week {{ week.week }}:</span>
+                                        <span class="font-bold">{{ week.weight }}kg</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="activeTab === 'Journal'">
+                <div class="max-w-2xl mx-auto space-y-6">
+                    <h2 class="text-3xl font-bold">Workout Journal</h2>
+                    
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-lg font-bold mb-4">New Entry</h3>
+                        <textarea v-model="journalText" placeholder="How was your workout? Write about your progress, feelings, or any notes..." 
+                            class="w-full bg-slate-800 rounded-lg p-4 outline-none focus:ring-2 ring-cyan-500 resize-none"
+                            rows="6"></textarea>
+                        <button @click="saveJournalEntry" 
+                            :disabled="!journalText.trim()"
+                            :class="journalText.trim() ? 'bg-gradient-to-r from-indigo-600 to-cyan-600' : 'bg-slate-700 opacity-50 cursor-not-allowed'"
+                            class="w-full mt-4 py-3 rounded-xl font-bold hover:opacity-90 transition-all">
+                            💾 Save Entry
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-bold">Past Entries</h3>
+                        
+                        <div v-if="journalEntries.length === 0" class="glass rounded-2xl p-12 text-center">
+                            <div class="text-6xl mb-4">📝</div>
+                            <h4 class="text-xl font-bold mb-2">No Entries Yet</h4>
+                            <p class="text-slate-400">Start journaling about your workouts</p>
+                        </div>
+                        
+                        <div v-else v-for="entry in journalEntries" :key="entry.id" class="glass rounded-xl p-6">
+                            <div class="flex justify-between items-start mb-3">
+                                <p class="text-sm text-slate-400">{{ new Date(entry.timestamp).toLocaleString() }}</p>
+                                <button @click="deleteJournalEntry(entry.id)" class="text-red-500 hover:text-red-400">
+                                    🗑️
+                                </button>
+                            </div>
+                            <p class="text-slate-200 whitespace-pre-wrap">{{ entry.text }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div v-if="showTemplates" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100]">
+            <div class="glass rounded-3xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold">Workout Templates</h3>
+                    <button @click="showTemplates = false" class="text-slate-400 hover:text-white text-2xl">✕</button>
+                </div>
+                <div class="space-y-4">
+                    <div v-for="template in templates" :key="template.id" 
+                        class="bg-slate-800 rounded-xl p-4 hover:bg-slate-700 cursor-pointer transition-all"
+                        @click="loadTemplate(template)">
+                        <h4 class="font-bold text-lg">{{ template.name }}</h4>
+                        <p class="text-sm text-slate-400">{{ template.exercises.length }} exercises</p>
+                    </div>
+                    <div v-if="templates.length === 0" class="text-center py-8 text-slate-400">
+                        No templates saved yet
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showExportImport" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100]">
+            <div class="glass rounded-3xl p-8 max-w-md w-full mx-4">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold">Data Management</h3>
+                    <button @click="showExportImport = false" class="text-slate-400 hover:text-white text-2xl">✕</button>
+                </div>
+                <div class="space-y-4">
+                    <button @click="exportData" class="w-full py-4 bg-indigo-600 rounded-xl font-bold hover:opacity-90">
+                        📥 Export Backup (CSV)
+                    </button>
+                    <div>
+                        <input type="file" @change="importData" accept=".csv" id="importFile" class="hidden">
+                        <label for="importFile" class="block w-full py-4 bg-cyan-600 rounded-xl font-bold hover:opacity-90 text-center cursor-pointer">
+                            📤 Import Backup (CSV)
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const { createApp } = Vue;
+
+            createApp({
+            data() {
+                return {
+                    tabs: ['Dashboard', 'Workout', 'History', 'Goals', 'Journal'],
+                    activeTab: 'Dashboard',
+                    timerState: 'stopped',
+                    sessionTime: 0,
+                    timerInterval: null,
+                    metronomeBpm: 120,
+                    metronomeActive: false,
+                    metronomeBeat: false,
+                    metronomeInterval: null,
+                    currentSession: null,
+                    templates: [],
+                    workoutDates: [], 
+                    goals: [],
+                    newGoal: { exercise: '', target: 0 },
+                    journalEntries: [],
+                    journalText: '',
+                    showTemplates: false,
+                    showExportImport: false,
+                    db: null
+                };
+            },
+            computed: {
+                fitnessStreakData() {
+                    const counts = {};
+                    this.workoutDates.forEach(w => {
+                        const date = new Date(w.date).toLocaleDateString();
+                        counts[date] = (counts[date] || 0) + 1;
+                    });
+                    const sorted = Object.keys(counts).sort((a, b) => new Date(a) - new Date(b));
+                    let cumulative = 0;
+                    return sorted.map(date => {
+                        cumulative += counts[date];
+                        return { date, count: cumulative };
+                    });
+                }
+            },
+            mounted() {
+                this.initDatabase();
+            },
+            methods: {
+                initDatabase() {
+                    const request = indexedDB.open('ExerciseTrackerPro', 2);
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        ['workouts', 'templates', 'goals', 'journal'].forEach(store => {
+                            if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath: 'id' });
+                        });
+                    };
+                    request.onsuccess = (e) => {
+                        this.db = e.target.result;
+                        this.loadAllData();
+                    };
+                },
+                loadAllData() {
+                    const tx = this.db.transaction(['workouts', 'templates', 'goals', 'journal'], 'readonly');
+                    tx.objectStore('workouts').getAll().onsuccess = (e) => this.workoutDates = e.target.result.sort((a, b) => b.date - a.date);
+                    tx.objectStore('templates').getAll().onsuccess = (e) => this.templates = e.target.result;
+                    tx.objectStore('goals').getAll().onsuccess = (e) => this.goals = e.target.result;
+                    tx.objectStore('journal').getAll().onsuccess = (e) => this.journalEntries = e.target.result.sort((a, b) => b.timestamp - a.timestamp);
+                },
+                saveToDb(store, data) {
+                    const tx = this.db.transaction(store, 'readwrite');
+                    tx.objectStore(store).put(data);
+                    tx.oncomplete = () => this.loadAllData();
+                },
+                deleteFromDb(store, id) {
+                    const tx = this.db.transaction(store, 'readwrite');
+                    tx.objectStore(store).delete(id);
+                    tx.oncomplete = () => this.loadAllData();
+                },
+                startTimer() {
+                    this.timerState = 'running';
+                    this.sessionTime = 0;
+                    this.timerInterval = setInterval(() => this.sessionTime++, 1000);
+                },
+                pauseTimer() {
+                    this.timerState = 'paused';
+                    clearInterval(this.timerInterval);
+                },
+                resumeTimer() {
+                    this.timerState = 'running';
+                    this.timerInterval = setInterval(() => this.sessionTime++, 1000);
+                },
+                stopTimer() {
+                    clearInterval(this.timerInterval);
+                    this.timerState = 'stopped';
+                },
+                formatTime(seconds) {
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = seconds % 60;
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                },
+                toggleMetronome() {
+                    this.metronomeActive = !this.metronomeActive;
+                    if (this.metronomeActive) {
+                        this.metronomeInterval = setInterval(() => this.metronomeBeat = !this.metronomeBeat, (60 / this.metronomeBpm) * 1000);
+                    } else {
+                        clearInterval(this.metronomeInterval);
+                        this.metronomeBeat = false;
+                    }
+                },
+                startQuickSession() {
+                    this.currentSession = { id: Date.now(), name: 'Workout Session', date: new Date().toISOString(), exercises: [], duration: 0 };
+                    this.startTimer();
+                },
+                addExercise() {
+                    this.currentSession.exercises.push({ id: Date.now(), name: '', sets: null, reps: null, weight: null, rpe: null });
+                    this.$nextTick(() => {
+                        const list = document.getElementById('exercise-list');
+                        if (list && !this.sortableInitialized) {
+                            Sortable.create(list, { animation: 200, onEnd: (e) => {
+                                const item = this.currentSession.exercises.splice(e.oldIndex, 1)[0];
+                                this.currentSession.exercises.splice(e.newIndex, 0, item);
+                            }});
+                            this.sortableInitialized = true;
+                        }
+                    });
+                },
+                removeExercise(index) { this.currentSession.exercises.splice(index, 1); },
+                completeSession() {
+                    this.stopTimer();
+                    const workout = {
+                        id: Date.now(),
+                        date: Date.now(),
+                        name: this.currentSession.name,
+                        duration: this.sessionTime,
+                        exercises: JSON.parse(JSON.stringify(this.currentSession.exercises))
+                    };
+                    this.saveToDb('workouts', workout);
+                    this.currentSession = null;
+                    this.sortableInitialized = false;
+                    this.activeTab = 'History'; 
+                },
+                saveAsTemplate() {
+                    this.saveToDb('templates', { id: Date.now(), name: this.currentSession.name + ' Template', exercises: JSON.parse(JSON.stringify(this.currentSession.exercises)) });
+                    alert('Template saved!');
+                },
+                loadTemplate(template) {
+                    this.currentSession = { id: Date.now(), name: template.name.replace(' Template', ''), date: new Date().toISOString(), exercises: JSON.parse(JSON.stringify(template.exercises)), duration: 0 };
+                    this.showTemplates = false;
+                    this.startTimer();
+                },
+                addGoal() {
+                    if (!this.newGoal.exercise || !this.newGoal.target) return;
+                    this.saveToDb('goals', { id: Date.now(), exercise: this.newGoal.exercise, target: this.newGoal.target, current: 0 });
+                    this.newGoal = { exercise: '', target: 0 };
+                },
+                deleteGoal(id) { this.deleteFromDb('goals', id); },
+                updateGoalProgress(goal, value) { goal.current = value; this.saveToDb('goals', goal); },
+                getGoalProgress(goal) { return Math.min(100, Math.round((goal.current / goal.target) * 100)); },
+                getForecast(goal) {
+                    const forecast = [];
+                    let weight = goal.current || goal.target * 0.5;
+                    for (let week = 1; week <= 8 && weight < goal.target; week++) {
+                        weight *= 1.035;
+                        forecast.push({ week, weight: Math.round(weight * 10) / 10 });
+                    }
+                    return forecast;
+                },
+                saveJournalEntry() {
+                    if (!this.journalText.trim()) return;
+                    this.saveToDb('journal', { id: Date.now(), text: this.journalText, timestamp: Date.now() });
+                    this.journalText = '';
+                },
+                deleteJournalEntry(id) { this.deleteFromDb('journal', id); },
+                getStreakPoints() {
+                    if (this.fitnessStreakData.length === 0) return '';
+                    const maxCount = Math.max(...this.fitnessStreakData.map(p => p.count));
+                    return this.fitnessStreakData.map((point, i) => {
+                        const x = (i / (this.fitnessStreakData.length - 1)) * 380 + 10;
+                        const y = 140 - (point.count / maxCount) * 120;
+                        return `${x},${y}`;
+                    }).join(' ');
+                },
+                exportData() {
+                    const data = { workouts: this.workoutDates, templates: this.templates, goals: this.goals, journal: this.journalEntries };
+                    const csv = this.convertToCSV(data);
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                    a.download = `exercise-tracker-backup-${Date.now()}.csv`;
+                    a.click();
+                },
+                convertToCSV(data) {
+                    let csv = 'Type,ID,Data\n';
+                    Object.entries(data).forEach(([key, items]) => {
+                        const type = key.slice(0, -1);
+                        items.forEach(item => csv += `${type === 'workoutDate' ? 'workout' : type},${item.id},"${JSON.stringify(item).replace(/"/g, '""')}"\n`);
+                    });
+                    return csv;
+                },
+                importData(event) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const lines = e.target.result.split('\n').slice(1);
+                        lines.forEach(line => {
+                            const match = line.match(/^([^,]+),([^,]+),("(.*)")$/);
+                            if (!match) return;
+                            const [_, type, id, rawDataStr] = match;
+                            const data = JSON.parse(rawDataStr.replace(/""/g, '"').slice(1, -1));
+                            const stores = { workout: 'workouts', template: 'templates', goal: 'goals', journal: 'journal' };
+                            if (stores[type]) this.saveToDb(stores[type], data);
+                        });
+                        alert('Data imported successfully!');
+                        this.showExportImport = false;
+                        this.loadAllData();
+                    };
+                    reader.readAsText(event.target.files[0]);
+                }
+            },
+            watch: {
+                metronomeBpm() {
+                    if (this.metronomeActive) {
+                        clearInterval(this.metronomeInterval);
+                        this.metronomeInterval = setInterval(() => this.metronomeBeat = !this.metronomeBeat, (60 / this.metronomeBpm) * 1000);
+                    }
+                }
+            }
+        }).mount('#app');
+        });
+    </script>
+</body>
+</html>
