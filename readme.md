@@ -36,3 +36,6 @@ Auto-Save - All data persists automatically in IndexedDB
 Export Backup - Download your data as CSV
 Import/Restore - Upload CSV to restore or transfer data
 Offline First - Works completely offline, no internet required
+
+LINKEDIN
+https://www.linkedin.com/in/shhaque/
